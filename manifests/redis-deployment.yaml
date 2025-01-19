@@ -1,0 +1,54 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: redis
+  namespace: exns 
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: redis
+  template:
+    metadata:
+      labels:
+        app: redis
+    spec:
+      containers:
+        - name: redis
+          image: bahamdi/ex:redis
+          resources: 
+            requests:
+              memory: "64Mi"
+              cpu: "50m"
+            limits:
+              memory: "128Mi"
+              cpu: "500m" 
+          ports:
+            - containerPort: 6399
+          volumeMounts:
+            - mountPath: /data
+              name: redis-data
+          env:
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: REDIS_PASSWORD
+      volumes:
+        - name: redis-data
+          persistentVolumeClaim:
+            claimName: redis-pvc
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis
+  namespace: exns 
+spec:
+  ports:
+    - port: 6399
+      targetPort: 6399
+  selector:
+    app: redis
+---

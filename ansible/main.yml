@@ -1,0 +1,68 @@
+- name: System Configuration Playbook
+  hosts: all
+  become: true
+  vars_files:
+        - vars/user_accounts.yml
+
+  tasks:
+    # Set system open file limit for root
+    - name: Set open file limit for root user
+      lineinfile:
+        path: /etc/security/limits.conf
+        line: "root - nofile 65536"
+        state: present
+    # Create users and groups
+    - name: Create user accounts and groups
+      include_role:
+        name: user_management
+
+    # Install Docker
+    - name: Install Docker
+      yum:
+        name: docker
+        state: present
+        update_cache: yes
+
+    # Start the Docker service
+    - name: Start Docker service
+      service:
+        name: docker
+        state: started
+        enabled: true
+
+    # Add current user to the docker group (optional)
+    - name: Add user to Docker group
+      user:
+        name: "{{ ansible_user }}"
+        group: docker
+        append: yes
+
+    # Ensure Docker is running
+    - name: Ensure Docker service is running
+      service:
+        name: docker
+        state: started
+        enabled: yes
+
+    # Run nginx container
+    - name: Start nginx container
+      docker_container:
+        name: happy_roentgen
+        image: public.ecr.aws/q0x2y8f9/nginx-demo
+        published_ports:
+          - "55000:55000"
+        state: started
+    # Install the nginx reverse proxy
+    - name: Install the Nginx Reverse proxy
+      include_role:
+        name: nginx
+
+  handlers:
+    - name: Restart sshd
+      service:
+        name: sshd
+        state: restarted
+    - name: Restart Nginx
+      service:
+        name: nginx
+        state: restarted

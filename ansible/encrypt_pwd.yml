@@ -1,0 +1,33 @@
+- name: Encrypt passwords and save updated user data
+  hosts: localhost
+  gather_facts: false
+  vars:
+    user_accounts_file: "vars/user_accounts.yml"
+    encryption_key: "PyrsvtvPn3QDxJc47TVrXajLd0O1oXma"
+
+  tasks:
+    - name: Load user accounts from file
+      include_vars:
+        file: "{{ user_accounts_file }}"
+      register: user_accounts
+
+    - name: Debug the user accounts data
+      debug:
+        var: user_accounts
+
+    - name: Encrypt each user's password
+      set_fact:
+        updated_user_accounts: "{{ updated_user_accounts | default({}) | combine({ item.key: item.value | combine({'passwd': item.value.passwd | ansible.builtin.vault(encryption_key) }) }) }}"
+      loop: "{{ user_accounts.ansible_facts.user_accounts | dict2items }}"
+      loop_control:
+        label: "{{ item.key }}"
+
+    - name: Debug updated user accounts with encrypted passwords
+      debug:
+        var: updated_user_accounts
+
+    - name: Save updated user accounts back to file
+      copy:
+        content: "{{ updated_user_accounts | to_nice_yaml }}"
+        dest: "{{ user_accounts_file }}"
+        mode: '0644'

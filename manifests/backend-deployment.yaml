@@ -1,0 +1,66 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend
+  namespace: exns 
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: backend
+  template:
+    metadata:
+      labels:
+        app: backend
+    spec:
+      containers:
+        - name: backend
+          image: bahamdi/ex:falcon
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "200m"
+            limits:
+              memory: "512Mi"
+              cpu: "1" 
+          ports:
+            - containerPort: 4000 
+          envFrom:
+            - configMapRef:
+                name: app-config
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend
+  namespace: exns 
+spec:
+  ports:
+    - port: 4000
+      targetPort: 4000
+  selector:
+    app: backend
+
+---
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: backend-ingress
+  namespace: exns
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+spec:
+  ingressClassName: ingress-local
+  rules:
+    - host: be.exns.local
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: backend 
+                port:
+                  number: 4000

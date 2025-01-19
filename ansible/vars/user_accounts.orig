@@ -1,0 +1,31 @@
+user_accounts:
+  jane.doe:
+    name: Jane DOE
+    mail: jane.doe@example.com
+    position: Software Engineer
+    office: London
+    login: jane.doe
+    passwd: Bv3h!p2DqP%Q
+    groups: ["sudo", "developers"]
+    ssh_keys:
+      - "ssh-rsa AAAAB3NzaC1yc2EAAAABIwAAAQEA1C4os6Tq2z5Z3DywAfPO6r6kVWQ8mYeXYxz2XJHwIWmJ1FI/JD/Z7/F1RMIo+dFWuEJ3ODT/MwtSox+bcbD09Rf0Ex33PLO6dsWeRrT6CVXf7j/Gs2P8WQv/N1MdaLJfjKnDUH6pAxPpE7XqO4+FOuz3zHKRQyPgzDUp5IV4OgxtNHJXSmIkNg4bdfF+JDk9OTvrZHg3W37zCVhrg=="
+  john.smith:
+    name: John SMITH
+    mail: john.smith@example.com
+    position: Systems Administrator
+    office: New York
+    login: john.smith
+    passwd: Zm9c&NvV7LbA
+    groups: ["sudo", "it"]
+    ssh_keys:
+      - "ssh-rsa AAAAB3NzaC1yc2EAAAABIwAAAQEAqseVTHgNcmBbdfXZUoWJSxs9hcC3Ao4EzXKiJ6OFTS8EbJSrBzKJqU7TLsTnGzR8BOl6pOEx6PmMt6LQqqqX2lToB4Ml6qYzM69Z4F8W79fEJ5MpGfdKUXOnKIl1Tg4nOEBZldUxEAYddShlCSrnJddvBfNz93OqmPAK3Rq1xlSlyB6FdOIeoI4rGO8UHyXyIuFP6P1BPXwWfsXn8SJd7GoJIN8AmBXmR=="
+  alice.williams:
+    name: Alice WILLIAMS
+    mail: alice.williams@example.com
+    position: DevOps Engineer
+    office: Berlin
+    login: alice.williams
+    passwd: Tq7d#3BpO1pN
+    groups: ["sudo", "infra"]
+    ssh_keys:
+      - "ssh-rsa AAAAB3NzaC1yc2EAAAABIwAAAQEAqrsZ5FVNl3hj9ZkXVzO7dAOXfBqhJsOtqW32EHYcpEXYf4J7Opk6TQQyPs8zF4PKMtkhfL9TV3HE9QWFkNO8RcFtoR9P6g8P4FoG68UqcMJOEY2fcbUJtXEN3HZ5OtTkpj9fPBZRJ3f2ExfUwYkIO6g6jOQsVmABbOeZsPyF1IXf4JtBQuAql3QJSUnE8G6UxWoHIVLJ6FqTzVJrLoRqOc9=="

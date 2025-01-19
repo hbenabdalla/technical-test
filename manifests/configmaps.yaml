@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: app-config
+  namespace: exns 
+data:
+  API_URL: "http://backend:4000" # Backend Service URL for frontend
+  REDIS_HOST: "redis"
+  REDIS_PORT: "6399"

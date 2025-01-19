@@ -1,0 +1,62 @@
+- name: Ensure groups exist
+  group:
+    name: "{{ item }}"
+    state: present
+  loop: "{{ user_accounts | dict2items | map(attribute='value.groups') | flatten | unique }}"
+  when: item is defined
+
+- name: Create user accounts and groups
+  user:
+    name: "{{ item.value.login }}"
+    comment: "{{ item.value.name }}"
+    groups: "{{ item.value.groups | join(',') }}"
+    password: "{{ item.value.passwd | password_hash('sha512') }}"
+    shell: /bin/bash
+    state: present
+    create_home: yes
+  loop: "{{ user_accounts | dict2items }}"
+  when: item.value.login is defined
+
+- name: Debug ssh_keys for each user
+  debug:
+    msg: "SSH keys for {{ item.key }}: {{ item.value.ssh_keys }}"
+  loop: "{{ user_accounts | dict2items }}"
+
+- name: Add SSH keys to users
+  authorized_key:
+    user: "{{ item.value.login }}"
+    state: present
+    key: "{{ item.value.ssh_keys | first }}"
+  loop: "{{ user_accounts | dict2items }}"
+  when: item.value.ssh_keys is defined and item.value.ssh_keys | length > 0
+
+- name: Create info file for each user
+  template:
+    src: user_info.j2
+    dest: "/home/{{ item.value.login }}/info"
+    owner: "{{ item.value.login }}"
+    group: "{{ item.value.groups[0] | default('users') }}"
+    mode: '0644'
+  loop: "{{ user_accounts | dict2items }}"
+  when: item.value.login is defined
+  notify: 
+     - Restart sshd
+- name: Download prrtprrt.txt file locally
+  local_action:
+    module: get_url
+    url: "https://gist.githubusercontent.com/slgevens/aa9a2fc52cb5fef8b41c1b11a8b7d3e3/raw/dc1e3e288967bd4818277e4688d1daf615225337/prrtprrt.txt"
+    dest: "{{ playbook_dir }}/files/prrtprrt.txt"
+    mode: '0644'
+    timeout: 60
+  delegate_to: localhost
+  run_once: true
+
+- name: Copy prrtprrt.txt to user directory
+  copy:
+    src: "{{ playbook_dir }}/files/prrtprrt.txt"
+    dest: "/home/{{ item.value.login }}/prrtprrt.txt"
+    owner: "{{ item.value.login }}"
+    group: "{{ item.value.login }}"
+    mode: '0644'
+  loop: "{{ user_accounts | dict2items }}"
+  when: item.value.login is defined

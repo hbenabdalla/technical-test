@@ -1,0 +1,2 @@
+nginx_port: 80
+proxy_pass_target: "http://127.0.0.1:55000"

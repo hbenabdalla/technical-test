@@ -1,0 +1,136 @@
+image: docker:latest
+
+services:
+  - name: docker:20.10.7-dind
+    alias: docker
+stages:
+  - build
+  - test
+  - deploy
+
+variables:
+  DOCKER_IMAGE_FRONTEND: $CI_REGISTRY_IMAGE/example-ariane
+  DOCKER_IMAGE_BACKEND: $CI_REGISTRY_IMAGE/example-falcon
+  DOCKER_IMAGE_REDIS: $CI_REGISTRY_IMAGE/redis
+  KUBE_CONFIG: "" #provide kubeconfig base64 encoded
+  KUBE_NAMESPACE: exns
+
+# Build Stage
+build-frontend:
+  stage: build
+  services:
+    - docker:dind
+  variables:
+    DOCKER_HOST: tcp://docker:2375
+  before_script:
+    - echo "Connect to gitlab registry..."
+    - echo $CI_REGISTRY
+    - docker login -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD" $CI_REGISTRY
+    - echo "$CI_JOB_TOKEN" | docker login -u "$CI_REGISTRY_USER" --password-stdin $CI_REGISTRY
+  script:
+    - cd example-ariane
+    - docker build -t $DOCKER_IMAGE_FRONTEND:$CI_COMMIT_SHORT_SHA .
+    - docker push $DOCKER_IMAGE_FRONTEND:$CI_COMMIT_SHORT_SHA
+  tags:
+    - python
+  #when: manual
+
+build-backend:
+  stage: build
+  services:
+    - docker:dind
+  variables:
+    DOCKER_HOST: tcp://docker:2375
+  before_script:
+    - echo "Connect to gitlab registry..."
+    - echo $CI_REGISTRY
+    - docker login -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD" $CI_REGISTRY
+    - echo "$CI_JOB_TOKEN" | docker login -u "$CI_REGISTRY_USER" --password-stdin $CI_REGISTRY
+  script:
+    - cd example-falcon
+    - docker build -t $DOCKER_IMAGE_BACKEND:$CI_COMMIT_SHORT_SHA .
+    - docker push $DOCKER_IMAGE_BACKEND:$CI_COMMIT_SHORT_SHA
+  tags:
+    - python
+  #when: manual
+
+build-redis:
+  stage: build
+  services:
+    - docker:dind
+  variables:
+    DOCKER_HOST: tcp://docker:2375
+  before_script:
+    - echo "Connect to gitlab registry..."
+    - echo $CI_REGISTRY
+    - docker login -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD" $CI_REGISTRY
+    - echo "$CI_JOB_TOKEN" | docker login -u "$CI_REGISTRY_USER" --password-stdin $CI_REGISTRY
+  script:
+    - cd redis
+    - docker build -t $DOCKER_IMAGE_REDIS:$CI_COMMIT_SHORT_SHA .
+    - docker push $DOCKER_IMAGE_REDIS:$CI_COMMIT_SHORT_SHA
+  tags:
+    - python
+  #when: manual
+
+# Test Stage
+test-frontend:
+  stage: test
+  image: node:18
+  services:
+    - docker:dind
+  variables:
+    DOCKER_HOST: tcp://docker:2375
+  script:
+    - cd example-ariane
+    - npm install
+    - npm install --save-dev mocha chai supertest chai-http
+    - npm test
+  tags:
+    - python
+  #when: manual
+
+
+# Deploy Stage
+deploy-project:
+  stage: deploy
+  image: thecodingmachine/k8s-rsync:0.0.1
+  services:
+    - docker:dind
+  variables:
+    DOCKER_HOST: tcp://docker:2375
+  before_script:
+    - mkdir /root/.kube
+    - echo "$KUBE_CONFIG" | base64 -d > ~/.kube/config
+  script:
+    - kubectl create namespace $KUBE_NAMESPACE || echo "namespace already exists"
+    - echo "Applying secrets"
+    - kubectl apply -f manifests/secrets.yaml
+
+    - echo "Applying configmaps"
+    - kubectl apply -f manifests/configmaps.yaml
+
+    - echo "Applying persistent volumes"
+    - kubectl apply -f manifests/persistent-volumes.yaml
+
+    - echo "Applying redis deployment"
+    - kubectl apply -f manifests/redis-deployment.yaml
+
+    - echo "Applying backend deployment"
+    - kubectl apply -f manifests/backend-deployment.yaml
+
+    - echo "Applying frontend deployment"
+    - kubectl apply -f manifests/frontend-deployment.yaml
+
+    # Dynamically update images for each deployment
+
+    - echo "Updating Redis deployment image"
+    - kubectl set image deployment/redis redis=$DOCKER_IMAGE_REDIS:$CI_COMMIT_SHORT_SHA -n $KUBE_NAMESPACE
+
+    - echo "Updating backend deployment image"
+    - kubectl set image deployment/backend backend=$DOCKER_IMAGE_BACKEND:$CI_COMMIT_SHORT_SHA -n $KUBE_NAMESPACE
+
+    - echo "Updating frontend deployment image"
+    - kubectl set image deployment/frontend frontend=$DOCKER_IMAGE_FRONTEND:$CI_COMMIT_SHORT_SHA -n $KUBE_NAMESPACE
+  tags:
+    - python
