@@ -235,3 +235,117 @@ The playbook will run all the tasks defined in it, such as managing user account
 ```
 ansible-playbook encrypt_pwd.yml
 ```
+# technical-test CI/CD Pipeline
+
+This document describes the workflow and steps involved in the CI/CD pipeline for deploying the Example Project. The pipeline is configured to build and deploy a multi-container application consisting of a frontend, backend, and Redis service. It is designed to work with GitLab CI/CD using Docker-in-Docker (DinD) and Kubernetes for deployment.
+
+## Assumptions
+
+1. Docker-in-Docker (DinD) Setup:
+
+    + The pipeline uses the Docker-in-Docker (`docker:dind`) service to enable Docker commands inside the CI runner.
+    + The runner will be configured to use Docker as the container runtime, allowing Docker builds and pushes within the CI pipeline.
+
+2. Kubernetes Deployment:
+
+    + Kubernetes is used for deploying the services, with deployment YAML files stored in the manifests/ directory.
+    + The pipeline will create Kubernetes resources such as namespaces, secrets, configmaps, persistent volumes, and deployments.
+    + The pipeline assumes access to a Kubernetes cluster and that the Kubernetes config (`$KUBE_CONFIG`) is provided as a base64 encoded string in the GitLab environment variables.
+
+3. GitLab Container Registry:
+
+    + The pipeline uses the GitLab container registry (`$CI_REGISTRY`) for storing Docker images. The images are tagged with the commit SHA (`$CI_COMMIT_SHORT_SHA`) to ensure unique versioning for each commit.
+
+4. Node.js Frontend Tests:
+
+    + The frontend service is tested using npm and the mocha, chai, and supertest libraries. These tests are run during the test stage.
+
+## CI/CD Pipeline Workflow
+
+### Stages
+
+The pipeline consists of three main stages:
+
+   1. Build: Builds the Docker images for the frontend, backend, and Redis services.
+   2. Test: Runs tests for the frontend service.
+   3. Deploy: Deploys the application to a Kubernetes cluster.
+
+### Stage Breakdown
+
+1. Build Stage
+
+The pipeline defines three jobs in the build stage: `build-frontend`, `build-backend`, and `build-redis`. Each job performs the following steps:
+
++ Login to GitLab Docker Registry: Logs in to GitLab's container registry using the provided `$CI_REGISTRY_USER` and `$CI_REGISTRY_PASSWORD` credentials.
++ Docker Build & Push:
+
+    Each service (frontend, backend, Redis) is built using the docker build command and pushed to the GitLab registry using the tag `$CI_COMMIT_SHORT_SHA`.
+
+For example, the build-frontend job works with the following steps:
+
+``` yaml
+docker build -t $DOCKER_IMAGE_FRONTEND:$CI_COMMIT_SHORT_SHA .
+docker push $DOCKER_IMAGE_FRONTEND:$CI_COMMIT_SHORT_SHA
+```
+2. Test Stage
+
+The test-frontend job performs the following steps:
+
+  + Install Dependencies: Installs necessary dependencies using `npm install` for the frontend project.
+  + Run Tests: Runs the tests using `mocha`, `chai`, and `supertest`.
+
+Example configuration for the test-frontend job:
+``` yaml
+npm install
+npm test
+```
+
+3. Deploy Stage
+
+The deploy stage is responsible for deploying the application to a Kubernetes cluster. The deploy-project job includes the following steps:
+
+  + Set Up Kubernetes Config: The `$KUBE_CONFIG` environment variable is decoded and used to configure Kubernetes access.
+  ``` bash
+  echo "$KUBE_CONFIG" | base64 -d > ~/.kube/config
+  ```
+  + Create Kubernetes Namespace: The pipeline will create a Kubernetes namespace for the application. If the namespace already exists, it will skip the creation step.
+  ``` bash
+  kubectl create namespace $KUBE_NAMESPACE || echo "namespace already exists"
+  ```
+  + Apply Kubernetes Resources:
+
+    The pipeline applies the following Kubernetes resources from the manifests/ directory:
+      - Secrets
+      - Configmaps
+      - Persistent Volumes
+      - Redis Deployment
+      - Backend Deployment
+      - Frontend Deployment
+
+  + Update Deployment Images: After deploying the resources, the pipeline updates the image for each Kubernetes deployment (frontend, backend, Redis) to the newly built images using the `$CI_COMMIT_SHORT_SHA` tag.
+  ``` yaml
+  kubectl set image deployment/redis redis=$DOCKER_IMAGE_REDIS:$CI_COMMIT_SHORT_SHA -n $KUBE_NAMESPACE
+  kubectl set image deployment/backend backend=$DOCKER_IMAGE_BACKEND:$CI_COMMIT_SHORT_SHA -n $KUBE_NAMESPACE
+  kubectl set image deployment/frontend frontend=$DOCKER_IMAGE_FRONTEND:$CI_COMMIT_SHORT_SHA -n $KUBE_NAMESPACE
+  ```
+### Environment Variables
+
+  The pipeline uses the following environment variables:
+
+    + DOCKER_IMAGE_FRONTEND: The Docker image for the frontend service in the GitLab registry.
+    + DOCKER_IMAGE_BACKEND: The Docker image for the backend service in the GitLab registry.
+    + DOCKER_IMAGE_REDIS: The Docker image for the Redis service in the GitLab registry.
+    + KUBE_CONFIG: A base64-encoded string of the Kubernetes configuration file.
+    + KUBE_NAMESPACE: The Kubernetes namespace where the application will be deployed (default: `exns`).
+
+### Assumptions on GitLab CI/CD Runner Configuration
+  
++ Docker-in-Docker: The pipeline is designed to use Docker-in-Docker (`docker:dind`) for building and pushing Docker images. This requires the GitLab runner to be configured with the `docker:latest` image and the `docker:dind` service to allow Docker commands inside the CI pipeline.
+
+Example:
+``` yaml
+services:
+  - name: docker:20.10.7-dind
+    alias: docker
+```
++ Kubernetes Cluster Access: The GitLab runner should have access to the Kubernetes cluster where the application will be deployed. Ensure the `KUBE_CONFIG` is correctly configured to access the cluster.
